@@ -1,4 +1,3 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -8,6 +7,7 @@ plugins {
     alias(libs.plugins.jetbrainsCompose)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlinxSerialization)
+    kotlin("native.cocoapods") version "1.5.0"
 }
 
 kotlin {
@@ -17,9 +17,7 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
-    jvm("desktop")
-    
+
     listOf(
         iosX64(),
         iosArm64(),
@@ -30,14 +28,39 @@ kotlin {
             isStatic = true
         }
     }
-    
+
+    cocoapods {
+        summary = "Some description for the Shared Module"
+        homepage = "Link to the Shared Module homepage"
+        version = "1.0"
+        ios.deploymentTarget = "15.4" // ⚠️ The version should be the same as we declared in the Podfile
+
+        podfile = project.file("../iosApp/Podfile")
+
+        pod("GoogleSignIn")
+
+        // ⚠️ Keep this line to make it work and not have issues in the iosApp
+        framework {
+            baseName = "ComposeApp"
+            isStatic = true
+        }
+
+        // To be able to import the MQTTClient library in the iosMain Kotlin code
+        pod("MQTTClient") {
+            extraOpts += listOf("-compiler-option", "-fmodules") // So far this line is mandatory to be able to compile
+        }
+    }
+
     sourceSets {
-        val desktopMain by getting
-        
+
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.androidx.credentials)
+            implementation(libs.androidx.credentials.play.services.auth)
+            implementation(libs.googleid)
+            implementation(libs.koin.android)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -51,11 +74,12 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.negotiation)
             implementation(libs.kotlin.serialization)
+            implementation(project.dependencies.platform(libs.koin.bom))
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
         }
-        desktopMain.dependencies {
-            implementation(compose.desktop.currentOs)
-            implementation(libs.kotlinx.coroutines.swing)
-        }
+
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
         }
@@ -91,17 +115,6 @@ android {
 
 dependencies {
     implementation(libs.androidx.ui.geometry.android)
+    implementation(libs.credentials)
     debugImplementation(compose.uiTooling)
-}
-
-compose.desktop {
-    application {
-        mainClass = "org.b3rx.subswipe.MainKt"
-
-        nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "org.b3rx.subswipe"
-            packageVersion = "1.0.0"
-        }
-    }
 }
